@@ -21,3 +21,5 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 /AutoLogin-src/nbproject/private/
+/AutoLogin-src/build/
+/test/nbproject/private/
