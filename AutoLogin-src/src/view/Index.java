@@ -5,13 +5,26 @@
  */
 package view;
 
+import java.awt.AWTException;
+import java.awt.HeadlessException;
+import java.awt.Image;
+import java.awt.SystemTray;
+import java.awt.Toolkit;
+import java.awt.TrayIcon;
+import java.awt.event.ActionEvent;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
 import javax.swing.JOptionPane;
-import util.MyUtils;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 
 /**
  *
@@ -26,13 +39,16 @@ public class Index extends javax.swing.JFrame {
     private String username;
     private String password;
     private Thread t;
-    private final MyUtils myUtils = new MyUtils();
+    private SystemTray systemTray;
+    private TrayIcon trayIcon;
+    private boolean flag = false;
 
     public Index() {
         initComponents();
-        initThread();
         setLocationRelativeTo(null);
         getSaveConfig();
+        initThread();
+        initSystemTray();
     }
 
     private void getSaveConfig() {
@@ -85,18 +101,147 @@ public class Index extends javax.swing.JFrame {
             @Override
             public void run() {
                 while (true) {
-                    try {
-                        int sleep = myUtils.getSleepTime(URL);
+                    if (flag) {
+                        int sleep = getSleepTime(URL);
                         if (sleep == 15000 || sleep == 100) {
-                            myUtils.sendRequest(URL, username, password);
+                            sendRequest(URL, username, password);
                         }
-                        sleep(sleep);
+                        try {
+                            sleep(sleep);
+                        } catch (InterruptedException ex) {
+                        }
+                    }
+                    try {
+                        sleep(1);
                     } catch (InterruptedException ex) {
-                        Logger.getLogger(Index.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
             }
         };
+    }
+
+    private void initSystemTray() {
+        if (!SystemTray.isSupported()) {
+            systemTray = null;
+            return;
+        }
+        systemTray = SystemTray.getSystemTray();
+        Toolkit toolkit = Toolkit.getDefaultToolkit();
+        Image image = toolkit.getImage("favicon.gif");
+
+        trayIcon = new TrayIcon(image, "Auto Connect");
+        trayIcon.setImageAutoSize(true);
+        trayIcon.addActionListener((ActionEvent e) -> {
+            setVisible(true);
+        });
+        try {
+            systemTray.add(trayIcon);
+        } catch (AWTException ex) {
+        }
+    }
+
+    public String getURL() {
+        final String USER_AGENT = "Mozilla/5.0";
+        final String url = "http://msftconnecttest.com/redirect";
+
+        try {
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            con.setRequestMethod("GET");
+            con.setRequestProperty("User-Agent", USER_AGENT);
+            con.setConnectTimeout(5000);
+            int responseCode = con.getResponseCode();
+            if (responseCode != 200) {
+                if (testConnect()) {
+                    JOptionPane.showMessageDialog(null, "Your network is not the network of the FPT dormitory or you are already logged on to the network");
+                    return null;
+                } else {
+                    JOptionPane.showMessageDialog(null, "Cannot connect to Internet");
+                    return null;
+                }
+            }
+            String conString = con.toString();
+            if (!conString.contains("zone=zone")) {
+                JOptionPane.showMessageDialog(null, "Your network is not the network of the FPT dormitory or you are already logged on to the network");
+                return null;
+            }
+            int index = conString.indexOf("zone=zone");
+            String ret = conString.substring(44, index + 9);
+            return ret;
+        } catch (HeadlessException | IOException ex) {
+            if (testConnect()) {
+                JOptionPane.showMessageDialog(null, "Your network is not the network of the FPT dormitory or you are already logged on to the network");
+                return null;
+            } else {
+                JOptionPane.showMessageDialog(null, "Cannot connect to Internet");
+                return null;
+            }
+        }
+    }
+
+    private boolean testConnect() {
+        final String USER_AGENT = "Mozilla/5.0";
+        final String url = "https://www.google.com/";
+        try {
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            con.setRequestMethod("GET");
+            con.setRequestProperty("User-Agent", USER_AGENT);
+            con.setConnectTimeout(5000);
+            int responseCode = con.getResponseCode();
+            return responseCode == 200;
+        } catch (HeadlessException | IOException ex) {
+            return false;
+        }
+    }
+
+    public boolean sendRequest(String URL, String username, String password) {
+        try {
+            CloseableHttpClient client = HttpClients.createDefault();
+            HttpPost httpPost = new HttpPost(URL);
+            ArrayList<NameValuePair> params = new ArrayList<>();
+            params.add(new BasicNameValuePair("auth_user", username));
+            params.add(new BasicNameValuePair("auth_pass", password));
+            params.add(new BasicNameValuePair("accept", "true"));
+            httpPost.setEntity(new UrlEncodedFormEntity(params));
+            client.execute(httpPost);
+            return true;
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
+    public int getSleepTime(String URL) {
+        boolean isDormitory;
+        boolean haveInternet;
+        final String USER_AGENT = "Mozilla/5.0";
+        final String url = URL;
+        try {
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            con.setRequestMethod("GET");
+            con.setRequestProperty("User-Agent", USER_AGENT);
+            con.setConnectTimeout(3000);
+            int responseCode = con.getResponseCode();
+            isDormitory = (responseCode == 200);
+            haveInternet = testConnect();
+        } catch (HeadlessException | IOException ex) {
+            isDormitory = false;
+            haveInternet = testConnect();
+        }
+        if (isDormitory && haveInternet) {
+            return 15000;
+        }
+        if (isDormitory && !haveInternet) {
+            return 100;
+        }
+        if (!isDormitory && haveInternet) {
+            return 60000;
+        }
+        if (!isDormitory && !haveInternet) {
+            return 200;
+        }
+        return 60000;
     }
 
     /**
@@ -182,8 +327,18 @@ public class Index extends javax.swing.JFrame {
         });
 
         btnStop.setText("Stop Service");
+        btnStop.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnStopActionPerformed(evt);
+            }
+        });
 
         btnHide.setText("Hide Window");
+        btnHide.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnHideActionPerformed(evt);
+            }
+        });
 
         btnCancel.setText("Cancel");
         btnCancel.addActionListener(new java.awt.event.ActionListener() {
@@ -310,7 +465,7 @@ public class Index extends javax.swing.JFrame {
 
     private void btnDetectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnDetectActionPerformed
         txtStatus.setText("Detecting URL");
-        String temp = myUtils.getURL();
+        String temp = getURL();
         if (temp != null) {
             URL = temp;
             txtURL.setText(URL);
@@ -324,12 +479,22 @@ public class Index extends javax.swing.JFrame {
 
     private void btnStartActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStartActionPerformed
         getInfo();
-        if(t.isAlive()) {
+        flag = true;
+        if (!t.isAlive()) {
+            t.start();
             JOptionPane.showMessageDialog(this, "Service is starting");
-            return;
         }
-        t.start();
+        txtStatus.setText("Service is running");
     }//GEN-LAST:event_btnStartActionPerformed
+
+    private void btnHideActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnHideActionPerformed
+        dispose();
+    }//GEN-LAST:event_btnHideActionPerformed
+
+    private void btnStopActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnStopActionPerformed
+        flag = false;
+        txtStatus.setText("Service have been stopped");
+    }//GEN-LAST:event_btnStopActionPerformed
 
     /**
      * @param args the command line arguments
@@ -347,15 +512,10 @@ public class Index extends javax.swing.JFrame {
                     break;
                 }
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(Index.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(Index.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(Index.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(Index.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
         }
+        //</editor-fold>
+        
         //</editor-fold>
 
         /* Create and display the form */
