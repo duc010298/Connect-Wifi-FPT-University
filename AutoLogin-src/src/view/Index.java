@@ -102,10 +102,8 @@ public class Index extends javax.swing.JFrame {
             public void run() {
                 while (true) {
                     if (flag) {
-                        int sleep = getSleepTime(URL);
-                        if (sleep == 15000 || sleep == 100) {
-                            sendRequest(URL, username, password);
-                        }
+                        int sleep = getSleepTime();
+                        sendRequest(URL, username, password);
                         try {
                             sleep(sleep);
                         } catch (InterruptedException ex) {
@@ -211,37 +209,12 @@ public class Index extends javax.swing.JFrame {
         }
     }
 
-    public int getSleepTime(String URL) {
-        boolean isDormitory;
-        boolean haveInternet;
-        final String USER_AGENT = "Mozilla/5.0";
-        final String url = URL;
-        try {
-            URL obj = new URL(url);
-            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
-            con.setRequestMethod("GET");
-            con.setRequestProperty("User-Agent", USER_AGENT);
-            con.setConnectTimeout(3000);
-            int responseCode = con.getResponseCode();
-            isDormitory = (responseCode == 200);
-            haveInternet = testConnect();
-        } catch (HeadlessException | IOException ex) {
-            isDormitory = false;
-            haveInternet = testConnect();
-        }
-        if (isDormitory && haveInternet) {
-            return 15000;
-        }
-        if (isDormitory && !haveInternet) {
+    public int getSleepTime() {
+        if (testConnect()) {
+            return 3000;
+        } else {
             return 100;
         }
-        if (!isDormitory && haveInternet) {
-            return 60000;
-        }
-        if (!isDormitory && !haveInternet) {
-            return 200;
-        }
-        return 60000;
     }
 
     /**
@@ -515,7 +488,7 @@ public class Index extends javax.swing.JFrame {
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
         }
         //</editor-fold>
-        
+
         //</editor-fold>
 
         /* Create and display the form */
