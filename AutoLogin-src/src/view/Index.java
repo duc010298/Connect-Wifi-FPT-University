@@ -12,20 +12,19 @@ import java.awt.SystemTray;
 import java.awt.Toolkit;
 import java.awt.TrayIcon;
 import java.awt.event.ActionEvent;
-import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.Map;
-import javax.net.ssl.HttpsURLConnection;
+import java.util.ArrayList;
 import javax.swing.JOptionPane;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 
 /**
  *
@@ -46,15 +45,10 @@ public class Index extends javax.swing.JFrame {
 
     public Index() {
         initComponents();
-        setIcon();
         setLocationRelativeTo(null);
         getSaveConfig();
         initThread();
         initSystemTray();
-    }
-    
-    private void setIcon() {
-        setIconImage(Toolkit.getDefaultToolkit().getImage(getClass().getResource("wifi.png")));
     }
 
     private void getSaveConfig() {
@@ -131,9 +125,9 @@ public class Index extends javax.swing.JFrame {
         }
         systemTray = SystemTray.getSystemTray();
         Toolkit toolkit = Toolkit.getDefaultToolkit();
-        Image image = toolkit.getImage(getClass().getResource("wifi.gif"));
+        Image image = toolkit.getImage("favicon.gif");
 
-        trayIcon = new TrayIcon(image, "Auto Connect Wifi");
+        trayIcon = new TrayIcon(image, "Auto Connect");
         trayIcon.setImageAutoSize(true);
         trayIcon.addActionListener((ActionEvent e) -> {
             setVisible(true);
@@ -144,7 +138,7 @@ public class Index extends javax.swing.JFrame {
         }
     }
 
-    private String getURL() {
+    public String getURL() {
         final String USER_AGENT = "Mozilla/5.0";
         final String url = "http://msftconnecttest.com/redirect";
 
@@ -199,59 +193,28 @@ public class Index extends javax.swing.JFrame {
         }
     }
 
-    private void sendRequest(String URLConnect, String username, String password) {
-        HashMap<String, String> dataPost = new HashMap<>();
-        dataPost.put("auth_user", username);
-        dataPost.put("auth_pass", password);
-        dataPost.put("accept", "true");
-
+    public boolean sendRequest(String URL, String username, String password) {
         try {
-            URL url = new URL(URLConnect);
-
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setReadTimeout(15000);
-            conn.setConnectTimeout(15000);
-            conn.setRequestMethod("POST");
-            conn.setDoInput(false);
-            conn.setDoOutput(false);
-
-            try (OutputStream os = conn.getOutputStream(); 
-                    BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))) {
-                writer.write(getPostDataString(dataPost));
-                writer.flush();
-            }
-            int responseCode = conn.getResponseCode();
-
-            if (responseCode == HttpsURLConnection.HTTP_OK) {
-
-            }
-        } catch (IOException e) {
+            CloseableHttpClient client = HttpClients.createDefault();
+            HttpPost httpPost = new HttpPost(URL);
+            ArrayList<NameValuePair> params = new ArrayList<>();
+            params.add(new BasicNameValuePair("auth_user", username));
+            params.add(new BasicNameValuePair("auth_pass", password));
+            params.add(new BasicNameValuePair("accept", "true"));
+            httpPost.setEntity(new UrlEncodedFormEntity(params));
+            client.execute(httpPost);
+            return true;
+        } catch (IOException ex) {
+            return false;
         }
     }
 
-    private int getSleepTime() {
+    public int getSleepTime() {
         if (testConnect()) {
             return 3000;
         } else {
             return 100;
         }
-    }
-
-    private String getPostDataString(HashMap<String, String> params) throws UnsupportedEncodingException {
-        StringBuilder result = new StringBuilder();
-        boolean first = true;
-        for (Map.Entry<String, String> entry : params.entrySet()) {
-            if (first) {
-                first = false;
-            } else {
-                result.append("&");
-            }
-            result.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
-            result.append("=");
-            result.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
-        }
-
-        return result.toString();
     }
 
     /**
