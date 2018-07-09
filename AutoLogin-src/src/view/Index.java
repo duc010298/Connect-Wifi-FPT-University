@@ -49,6 +49,7 @@ public class Index extends javax.swing.JFrame {
         getSaveConfig();
         initThread();
         initSystemTray();
+        setIcon();
     }
 
     private void getSaveConfig() {
@@ -118,6 +119,10 @@ public class Index extends javax.swing.JFrame {
         };
     }
 
+    private void setIcon() {
+        setIconImage(Toolkit.getDefaultToolkit().getImage(getClass().getResource("wifi.png")));
+    }
+
     private void initSystemTray() {
         if (!SystemTray.isSupported()) {
             systemTray = null;
@@ -125,7 +130,7 @@ public class Index extends javax.swing.JFrame {
         }
         systemTray = SystemTray.getSystemTray();
         Toolkit toolkit = Toolkit.getDefaultToolkit();
-        Image image = toolkit.getImage("favicon.gif");
+        Image image = toolkit.getImage(getClass().getResource("favicon.gif"));
 
         trayIcon = new TrayIcon(image, "Auto Connect");
         trayIcon.setImageAutoSize(true);
