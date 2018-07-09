@@ -12,19 +12,19 @@ import java.awt.SystemTray;
 import java.awt.Toolkit;
 import java.awt.TrayIcon;
 import java.awt.event.ActionEvent;
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
 import javax.swing.JOptionPane;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
 
 /**
  *
@@ -138,7 +138,7 @@ public class Index extends javax.swing.JFrame {
         }
     }
 
-    public String getURL() {
+    private String getURL() {
         final String USER_AGENT = "Mozilla/5.0";
         final String url = "http://msftconnecttest.com/redirect";
 
@@ -193,25 +193,57 @@ public class Index extends javax.swing.JFrame {
         }
     }
 
-    public boolean sendRequest(String URL, String username, String password) {
+    private void sendRequest(String URLConnect, String user, String pass) {
+        HashMap<String, String> dataPost = new HashMap<>();
+        dataPost.put("auth_user", user);
+        dataPost.put("auth_pass", pass);
+        dataPost.put("accept", "true");
+
+        HttpURLConnection conn = null;
+
         try {
-            CloseableHttpClient client = HttpClients.createDefault();
-            HttpPost httpPost = new HttpPost(URL);
-            ArrayList<NameValuePair> params = new ArrayList<>();
-            params.add(new BasicNameValuePair("auth_user", username));
-            params.add(new BasicNameValuePair("auth_pass", password));
-            params.add(new BasicNameValuePair("accept", "true"));
-            httpPost.setEntity(new UrlEncodedFormEntity(params));
-            client.execute(httpPost);
-            return true;
-        } catch (IOException ex) {
-            return false;
+            URL url = new URL(URLConnect);
+
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(15000);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+
+            try (OutputStream os = conn.getOutputStream(); BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"))) {
+                writer.write(getPostDataString(dataPost));
+                writer.flush();
+            }
+
+            conn.getResponseCode();
+        } catch (IOException e) {
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
+
     }
 
-    public int getSleepTime() {
+    private String getPostDataString(HashMap<String, String> params) throws UnsupportedEncodingException {
+        StringBuilder result = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (first) {
+                first = false;
+            } else {
+                result.append("&");
+            }
+            result.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
+            result.append("=");
+            result.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+        }
+
+        return result.toString();
+    }
+
+    private int getSleepTime() {
         if (testConnect()) {
-            return 3000;
+            return 5000;
         } else {
             return 100;
         }
